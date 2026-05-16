@@ -59,7 +59,8 @@ CAPTURE_INTERVAL_S = 5.0
 # Résolution:
 # - 4608x2592 = max Camera Module 3 (plus détaillé, plus lourd)
 # - si le Pi Zero 2 W est trop lent -> descendre à (2304, 1296)
-IMAGE_SIZE = (4608, 2592)
+#IMAGE_SIZE = (4608, 2592)
+IMAGE_SIZE = (2304, 1296)
 
 # Temps pour laisser AE/AWB/AF se stabiliser au démarrage
 WARMUP_S = 2.0
@@ -148,15 +149,31 @@ def upload_file_to_drive(service, file_path: Path, drive_folder_id: str):
 # =========================
 # Camera
 # =========================
+# def init_camera():
+#     picam2 = Picamera2()
+
+#     config = picam2.create_still_configuration(
+#         main={"size": IMAGE_SIZE},
+#         buffer_count=2,
+#     )
+#     picam2.configure(config)
+
+#     picam2.start()
+#     logging.info("Caméra démarrée. Stabilisation...")
+#     time.sleep(WARMUP_S)
+
+#     return picam2
+
 def init_camera():
     picam2 = Picamera2()
 
     config = picam2.create_still_configuration(
         main={"size": IMAGE_SIZE},
-        buffer_count=2,
+        buffer_count=1,
+        raw=None,
     )
-    picam2.configure(config)
 
+    picam2.configure(config)
     picam2.start()
     logging.info("Caméra démarrée. Stabilisation...")
     time.sleep(WARMUP_S)
