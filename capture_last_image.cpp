@@ -22,13 +22,22 @@ void handle_signal(int) {
 struct Config {
     fs::path output_dir = "/var/lib/rpicam-http";
     std::string output_name = "LAST_CAPTURE.jpg";
-    int interval_ms = 1000;
-    int width = 1920;
-    int height = 1080;
-    int timeout_ms = 700;
+    fs::path baseDir = "/home/pi/captures_cam3";
+    fs::path pendingDir = baseDir / "pending";
+    fs::path uploadedDir = baseDir / "uploaded";
+    fs::path failedDir = baseDir / "failed";
+    int intervalSec = 5;
+
+    int interval_ms = 5000;
+    int width = 2304//1920;
+    int height = 1296//1080;
+    int timeout_ms = 700; // 1200;         // laisse AE/AWB/AF converger
     std::string autofocus_mode = "auto";
     std::string autofocus_range = "normal";
     std::string lens_position;
+
+    int shutterUs = 0;            // 0 = auto
+    int gain = 0;                 // 0 = auto
 };
 
 std::string shell_escape(const std::string &s) {
@@ -47,9 +56,9 @@ void print_usage(const char *prog) {
         << "Options:\n"
         << "  --output-dir PATH        Dossier de sortie (defaut: /var/lib/rpicam-http)\n"
         << "  --output-name NAME       Nom du fichier final (defaut: LAST_CAPTURE.jpg)\n"
-        << "  --interval-ms N          Intervalle entre captures (defaut: 1000)\n"
-        << "  --width N                Largeur image (defaut: 1920)\n"
-        << "  --height N               Hauteur image (defaut: 1080)\n"
+        << "  --interval-ms N          Intervalle entre captures (defaut: 5000)\n"
+        << "  --width N                Largeur image (defaut: 2304)\n"
+        << "  --height N               Hauteur image (defaut: 1296)\n"
         << "  --timeout-ms N           Temps preview/AF avant capture (defaut: 700)\n"
         << "  --autofocus-mode MODE    auto | continuous | manual (defaut: auto)\n"
         << "  --autofocus-range RANGE  normal | macro | full (defaut: normal)\n"
@@ -96,10 +105,11 @@ bool parse_args(int argc, char **argv, Config &cfg) {
     return true;
 }
 
-std::string build_command(const Config &cfg, const fs::path &temp_path) {
+std::string build_command(const Config &cfg, const fs::path &outfile) {
     std::ostringstream cmd;
     cmd << "rpicam-still"
         << " --nopreview"
+        << " --encoding jpg"
         << " --timeout " << cfg.timeout_ms
         << " --width " << cfg.width
         << " --height " << cfg.height
@@ -116,7 +126,14 @@ std::string build_command(const Config &cfg, const fs::path &temp_path) {
         cmd << " --lens-position " << cfg.lens_position;
     }
 
-    cmd << " --output " << shell_escape(temp_path.string());
+    if (cfg.shutterUs > 0) {
+        cmd << " --shutter " << cfg.shutterUs;
+    }
+    if (cfg.gain > 0) {
+        cmd << " --gain " << cfg.gain;
+    }
+
+    cmd << " --output " << shell_escape(outfile.string());
     return cmd.str();
 }
 
@@ -148,18 +165,25 @@ int main(int argc, char **argv) {
     while (!g_stop.load()) {
         auto start = std::chrono::steady_clock::now();
 
-        std::string cmd = build_command(cfg, temp_path);
+        fs::path outfile = cfg.pendingDir / ("img_" + nowTimestamp() + ".jpg");
+        std::string cmd = build_command(cfg, outfile);
         int ret = std::system(cmd.c_str());
 
-        if (ret == 0 && fs::exists(temp_path)) {
-            if (std::rename(temp_path.c_str(), final_path.c_str()) != 0) {
-                std::perror("rename");
-            } else {
+        if (ret == 0 && fs::exists(outfile)) {
+            // if (std::rename(outfile.c_str(), final_path.c_str()) != 0) {
+            //     std::perror("rename");
+            // } else {
+                // Copie de final_path vers outfile
+                std::error_code ec;
+                fs::copy_file(outfile, final_path, fs::copy_options::overwrite_existing, ec);
+                if (ec) {
+                    std::cerr << "Copy failed to " << outfile << " : " << ec.message() << "\n";
+                }
                 auto now = std::chrono::system_clock::now();
                 std::time_t tt = std::chrono::system_clock::to_time_t(now);
-                std::cout << "Captured -> " << final_path << " at "
+                std::cout << "Captured -> " << outfile << " at "
                           << std::put_time(std::localtime(&tt), "%F %T") << "\n";
-            }
+            // }
         } else {
             std::cerr << "Capture failed, exit code=" << ret << "\n";
         }
