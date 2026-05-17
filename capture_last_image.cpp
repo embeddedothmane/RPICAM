@@ -29,8 +29,8 @@ struct Config {
     int intervalSec = 5;
 
     int interval_ms = 5000;
-    int width = 2304//1920;
-    int height = 1296//1080;
+    int width = 2304;//1920;
+    int height = 1296;//1080;
     int timeout_ms = 700; // 1200;         // laisse AE/AWB/AF converger
     std::string autofocus_mode = "auto";
     std::string autofocus_range = "normal";
