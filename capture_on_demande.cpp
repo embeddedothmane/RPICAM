@@ -441,14 +441,6 @@ int main(int argc, char **argv) {
     }
 
     // for auto capture
-    std::error_code ec;
-    fs::create_directories(cfg.output_dir, ec);
-    if (ec) {
-        std::cerr << "Impossible de creer le dossier " << cfg.output_dir
-                  << " : " << ec.message() << "\n";
-        return 1;
-    }
-
     const fs::path final_path = cfg.output_dir / cfg.output_name;
     const fs::path temp_path = cfg.output_dir / (cfg.output_name + ".tmp");
 
