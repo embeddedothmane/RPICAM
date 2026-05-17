@@ -1,5 +1,6 @@
 #include <atomic>
 #include <chrono>
+#include <condition_variable>
 #include <csignal>
 #include <cstdlib>
 #include <filesystem>
@@ -11,6 +12,8 @@
 #include <vector>
 #include <cstdio>
 #include <ctime>
+#include <deque>
+#include <fstream>
 
 namespace fs = std::filesystem;
 
@@ -64,6 +67,19 @@ void print_usage(const char *prog) {
         << "  --autofocus-mode MODE    auto | continuous | manual (defaut: auto)\n"
         << "  --autofocus-range RANGE  normal | macro | full (defaut: normal)\n"
         << "  --lens-position VALUE    Position de lentille en dioptres si mode manual\n";
+}
+
+static std::string nowTimestamp() {
+    auto now = std::chrono::system_clock::now();
+    std::time_t t = std::chrono::system_clock::to_time_t(now);
+    auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()) % 1000;
+    std::tm tm{};
+    localtime_r(&t, &tm);
+
+    std::ostringstream oss;
+    oss << std::put_time(&tm, "%Y%m%d_%H%M%S")
+        << '_' << std::setw(3) << std::setfill('0') << ms.count();
+    return oss.str();
 }
 
 bool parse_args(int argc, char **argv, Config &cfg) {
