@@ -10,6 +10,7 @@
 #include <thread>
 #include <vector>
 #include <cstdio>
+#include <ctime>
 
 namespace fs = std::filesystem;
 
