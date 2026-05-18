@@ -1,0 +1,33 @@
+[Unit]
+Description=Pending SFTP sync daemon (Raspberry Pi -> VPS)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=pi
+Group=pi
+ExecStart=/usr/local/bin/pending_sftp_sync_v2 \
+  --host 10.20.30.40 \
+  --user root \
+  --remote-dir /root/RPICAMM/upload \
+  --pending-dir /home/pi/captures_cam3/pending \
+  --uploaded-dir /home/pi/captures_cam3/uploaded \
+  --failed-dir /home/pi/captures_cam3/failed \
+  --private-key /home/pi/.ssh/id_ed25519_capture_sync \
+  --public-key /home/pi/.ssh/id_ed25519_capture_sync.pub \
+  --known-hosts /home/pi/.ssh/known_hosts \
+  --scan-interval-s 2 \
+  --retry-wait-s 10 \
+  --offline-wait-s 15 \
+  --connect-timeout-s 10 \
+  --transfer-timeout-s 120 \
+  --low-speed-limit 32 \
+  --low-speed-time-s 30 \
+  --max-retries 10 \
+  --stability-seconds 5
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

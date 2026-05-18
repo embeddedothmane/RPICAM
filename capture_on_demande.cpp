@@ -15,6 +15,7 @@
 #include <thread>
 #include <ctime>
 #include <cstdio>
+#include <system_error>
 
 #include <mosquitto.h>
 
@@ -28,7 +29,7 @@ void handle_signal(int) {
 
 struct Config {
     // Chemins identiques au fichier capture_last_image.cpp
-    fs::path output_dir = "/var/lib/rpicam-http";
+    fs::path output_dir = "/home/pi/rpicam-http";
     std::string output_name = "LAST_CAPTURE.jpg";
     fs::path baseDir = "/home/pi/captures_cam3";
     fs::path pendingDir = baseDir / "pending";
@@ -202,6 +203,64 @@ std::string build_command(const Config &cfg, const fs::path &outfile) {
 
     cmd << " --output " << shell_escape(outfile.string());
     return cmd.str();
+}
+
+static constexpr std::uintmax_t LOW_DISK_THRESHOLD_BYTES = 4ULL * 1024 * 1024 * 1024; // 4 GiB
+
+bool purge_directory_contents(const fs::path& dir) {
+    std::error_code ec;
+
+    if (!fs::exists(dir, ec)) {
+        return true;
+    }
+
+    for (const auto& entry : fs::directory_iterator(dir, ec)) {
+        if (ec) {
+            std::cerr << "directory_iterator failed for " << dir << " : " << ec.message() << "\n";
+            return false;
+        }
+
+        std::error_code rm_ec;
+        fs::remove_all(entry.path(), rm_ec);
+        if (rm_ec) {
+            std::cerr << "remove_all failed for " << entry.path() << " : " << rm_ec.message() << "\n";
+            return false;
+        }
+    }
+
+    return true;
+}
+
+void cleanup_if_low_disk_space(const Config& cfg) {
+    std::error_code ec;
+
+    // On vérifie l'espace dispo sur la partition contenant /home/pi/captures_cam3
+    auto sp = fs::space(cfg.baseDir, ec);
+    if (ec) {
+        std::cerr << "fs::space failed for " << cfg.baseDir << " : " << ec.message() << "\n";
+        return;
+    }
+
+    std::cout << "Disk available on " << cfg.baseDir << " : " << sp.available << " bytes\n";
+
+    if (sp.available < LOW_DISK_THRESHOLD_BYTES) {
+        std::cerr << "Low disk space detected (< 4 GiB). Cleaning uploaded/ and failed/ ...\n";
+
+        bool ok_uploaded = purge_directory_contents(cfg.uploadedDir);
+        bool ok_failed   = purge_directory_contents(cfg.failedDir);
+
+        if (!ok_uploaded || !ok_failed) {
+            std::cerr << "Cleanup completed with errors.\n";
+        } else {
+            std::cout << "Cleanup done: uploaded/ and failed/ emptied.\n";
+        }
+
+        // Recheck après nettoyage
+        auto sp_after = fs::space(cfg.baseDir, ec);
+        if (!ec) {
+            std::cout << "Disk available after cleanup: " << sp_after.available << " bytes\n";
+        }
+    }
 }
 
 struct CaptureRequest {
@@ -435,10 +494,13 @@ int main(int argc, char **argv) {
     std::error_code ec;
     fs::create_directories(cfg.output_dir, ec);
     fs::create_directories(cfg.pendingDir, ec);
+    fs::create_directories(cfg.uploadedDir, ec);
+    fs::create_directories(cfg.failedDir, ec);
     if (ec) {
         std::cerr << "Impossible de creer les dossiers : " << ec.message() << "\n";
         return 1;
     }
+    cleanup_if_low_disk_space(cfg);
 
     // for auto capture
     const fs::path final_path = cfg.output_dir / cfg.output_name;

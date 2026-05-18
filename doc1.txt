@@ -1,0 +1,77 @@
+commandes
+-----
+CONTABO
+CONTABO COMP : 185.137.122.221 --- yousssef11042002
+contabu othmane.jdidi.ensaf@gmail.com youssef@jdidi
+
+ssh root@185.137.122.221
+youssef11042002
+-------
+chez hatim
+ssh -p 5004 pi@185.137.122.221
+HATIM2020
+------
+GIT
+git clone https://github.com/embeddedothmane/RPICAM.git
+embeddedothmane
+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
+------
+
+sudo apt update
+sudo apt install -y python3-pip python3-picamera2 python3-libcamera
+python3 -m pip install --break-system-packages -r requirements-rpi-cam-drive.txt
+or
+python3 -m pip install --break-system-packages google-api-python-client google-auth-httplib2 google-auth-oauthlib
+
+sudo apt install -y g++ libcurl4-openssl-dev openssh-client
+sudo apt install -y g++ rpicam-apps libmosquitto-dev mosquitto-clients  mosquitto-dev
+
+
+------------
+PYTHON
+
+python3 capture_drive_uploader.py
+
+g++ -std=c++17 -O2 -pthread capture_upload_rpi_cam3.cpp -o capture_upload_rpi_cam3
+
+g++ -std=c++17 -O2 -pthread capture_last_image.cpp -o capture_last_image
+g++ -std=c++17 -O2 -pthread last_capture_server.cpp -o last_capture_server
+
+g++ -std=c++17 -O2 -pthread capture_on_demande.cpp -lmosquitto -o capture_on_demande
+
+
+
+
+./capture_last_image --output-dir /var/lib/rpicam-http --interval-ms 5000 --width 2304 --height 1296 --timeout-ms 700 --autofocus-mode auto --autofocus-range normal
+./last_capture_server --public-dir /var/lib/rpicam-http --port 8080
+
+./capture_on_demande \
+  --mqtt-host 185.137.122.221 \
+  --mqtt-port 1883 \
+  --mqtt-topic rpicam/capture/request \
+  --output-dir /home/pi/captures_cam3/pending \
+  --output-name LAST_CAPTURE.jpg \
+  --width 2304 \
+  --height 1296 \
+  --timeout-ms 700 \
+  --autofocus-mode auto \
+  --autofocus-range normal
+
+
+{"command":"capture_on_demand","params":{"width":1920,"height":1080,"timeout_ms":400,"autofocus_mode":"manual","lens_position":"3.33","shutterUs":8000,"gain":1}}
+
+mosquitto_pub -h  185.137.122.221 -t rpicam/capture/request -m '{"command":"capture_on_demand"}'
+
+-----------------------
+
+
+
+sudo systemctl daemon-reload
+sudo systemctl enable start-commands.service
+sudo systemctl start start-commands.service
+
+
+ssh-keyscan -H 185.137.122.221 >> /home/pi/.ssh/known_hosts
+chmod 600 /home/pi/.ssh/known_hosts
+
+

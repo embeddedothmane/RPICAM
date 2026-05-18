@@ -1,0 +1,19 @@
+./pending_sftp_sync_v2 \
+  --host 185.137.122.221 \
+  --user root \
+  --remote-dir /srv/RPICAMM/upload \
+  --pending-dir /home/pi/captures_cam3/pending \
+  --uploaded-dir /home/pi/captures_cam3/uploaded \
+  --failed-dir /home/pi/captures_cam3/failed \
+  --private-key /home/pi/.ssh/id_ed25519_capture_sync \
+  --public-key /home/pi/.ssh/id_ed25519_capture_sync.pub \
+  --known-hosts /home/pi/.ssh/known_hosts \
+  --scan-interval-s 2 \
+  --retry-wait-s 10 \
+  --offline-wait-s 15 \
+  --connect-timeout-s 100 \
+  --transfer-timeout-s 1200 \
+  --low-speed-limit 32 \
+  --low-speed-time-s 30 \
+  --max-retries 10 \
+  --stability-seconds 5

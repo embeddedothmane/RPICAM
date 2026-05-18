@@ -1,0 +1,17 @@
+doc
+
+-----------------------
+Pour ton besoin “photo nette de document”, la première chose que j’ajusterais dans le code est :
+
+timeoutMs pour laisser l’AF converger ;
+shutterUs si tu veux figer un léger mouvement ;
+éventuellement monter la résolution vers 4608×2592 si le débit te convient. La Camera Module 3 supporte bien cette définition.
+la Camera Module 3 a un autofocus motorisé et une résolution 4608×2592
+--------------------------
+- autostart all
+- program 1 upload auto sync
+- program 2 capture  80% , X minutes de demarrage ?, chaque Y minutes , /alterner mode 2304×1296 et 4608×2592
+- program 3 capture sur demande 
+
+
+

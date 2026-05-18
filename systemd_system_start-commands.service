@@ -1,0 +1,14 @@
+[Unit]
+Description=Lancer mes commandes au boot
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/home/pi/RPICAM/Start_commands.sh
+RemainAfterExit=yes
+User=pi
+WorkingDirectory=/home/pi/RPICAM
+
+[Install]
+WantedBy=multi-user.target

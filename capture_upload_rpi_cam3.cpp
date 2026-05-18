@@ -127,37 +127,37 @@ static bool captureImage(const Config &cfg, const fs::path &filePath) {
     return rc == 0 && fs::exists(filePath) && fs::file_size(filePath) > 0;
 }
 
-static bool uploadWithRclone(const Config &cfg, const fs::path &filePath) {
-    // Upload vers n'importe quel drive supporté par rclone.
-    // copyto = envoie un fichier précis vers un chemin précis.
-    std::ostringstream remoteTarget;
-    remoteTarget << cfg.rcloneRemote;
-    if (!cfg.rcloneRemote.empty() && cfg.rcloneRemote.back() != '/') {
-        remoteTarget << '/';
-    }
-    remoteTarget << filePath.filename().string();
+// static bool uploadWithRclone(const Config &cfg, const fs::path &filePath) {
+//     // Upload vers n'importe quel drive supporté par rclone.
+//     // copyto = envoie un fichier précis vers un chemin précis.
+//     std::ostringstream remoteTarget;
+//     remoteTarget << cfg.rcloneRemote;
+//     if (!cfg.rcloneRemote.empty() && cfg.rcloneRemote.back() != '/') {
+//         remoteTarget << '/';
+//     }
+//     remoteTarget << filePath.filename().string();
 
-    std::ostringstream cmd;
-    cmd << "rclone copyto "
-        << shellEscape(filePath.string()) << ' '
-        << shellEscape(remoteTarget.str())
-        << " --retries 3 --low-level-retries 3";
+//     std::ostringstream cmd;
+//     cmd << "rclone copyto "
+//         << shellEscape(filePath.string()) << ' '
+//         << shellEscape(remoteTarget.str())
+//         << " --retries 3 --low-level-retries 3";
 
-    if (!cfg.verbose) {
-        cmd << " >/dev/null 2>&1";
-    }
+//     if (!cfg.verbose) {
+//         cmd << " >/dev/null 2>&1";
+//     }
 
-    int rc = runCommand(cmd.str());
-    return rc == 0;
-}
+//     int rc = runCommand(cmd.str());
+//     return rc == 0;
+// }
 
-static void preloadPending(const Config &cfg, WorkQueue &q) {
-    for (const auto &entry : fs::directory_iterator(cfg.pendingDir)) {
-        if (entry.is_regular_file() && entry.path().extension() == ".jpg") {
-            q.push(entry.path());
-        }
-    }
-}
+// static void preloadPending(const Config &cfg, WorkQueue &q) {
+//     for (const auto &entry : fs::directory_iterator(cfg.pendingDir)) {
+//         if (entry.is_regular_file() && entry.path().extension() == ".jpg") {
+//             q.push(entry.path());
+//         }
+//     }
+// }
 
 static void captureThread(const Config &cfg, WorkQueue &q) {
     while (!g_stop.load()) {
@@ -186,33 +186,33 @@ static void captureThread(const Config &cfg, WorkQueue &q) {
     }
 }
 
-static void uploadThread(const Config &cfg, WorkQueue &q) {
-    while (!g_stop.load()) {
-        fs::path filePath;
-        if (!q.pop(filePath)) {
-            continue;
-        }
-        if (filePath.empty()) continue;
-        if (!fs::exists(filePath)) continue;
+// static void uploadThread(const Config &cfg, WorkQueue &q) {
+//     while (!g_stop.load()) {
+//         fs::path filePath;
+//         if (!q.pop(filePath)) {
+//             continue;
+//         }
+//         if (filePath.empty()) continue;
+//         if (!fs::exists(filePath)) continue;
 
-        bool ok = uploadWithRclone(cfg, filePath);
-        if (ok) {
-            std::error_code ec;
-            fs::rename(filePath, cfg.uploadedDir / filePath.filename(), ec);
-            if (ec) {
-                std::cerr << "[UPLOAD] OK mais déplacement impossible: " << ec.message() << std::endl;
-            } else {
-                std::cout << "[UPLOAD] OK  " << filePath.filename() << std::endl;
-            }
-        } else {
-            std::cerr << "[UPLOAD] FAIL " << filePath.filename() << std::endl;
-            std::this_thread::sleep_for(15s);
-            if (!g_stop.load() && fs::exists(filePath)) {
-                q.push(filePath); // retry plus tard
-            }
-        }
-    }
-}
+//         bool ok = uploadWithRclone(cfg, filePath);
+//         if (ok) {
+//             std::error_code ec;
+//             fs::rename(filePath, cfg.uploadedDir / filePath.filename(), ec);
+//             if (ec) {
+//                 std::cerr << "[UPLOAD] OK mais déplacement impossible: " << ec.message() << std::endl;
+//             } else {
+//                 std::cout << "[UPLOAD] OK  " << filePath.filename() << std::endl;
+//             }
+//         } else {
+//             std::cerr << "[UPLOAD] FAIL " << filePath.filename() << std::endl;
+//             std::this_thread::sleep_for(15s);
+//             if (!g_stop.load() && fs::exists(filePath)) {
+//                 q.push(filePath); // retry plus tard
+//             }
+//         }
+//     }
+// }
 
 static void signalHandler(int) {
     g_stop.store(true);

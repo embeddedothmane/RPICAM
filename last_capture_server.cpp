@@ -23,7 +23,7 @@ void handle_signal(int) {
 }
 
 struct Config {
-    fs::path public_dir = "/var/lib/rpicam-http";
+    fs::path public_dir = "/home/pi/rpicam-http";
     std::string image_name = "LAST_CAPTURE.jpg";
     int port = 8080;
 };

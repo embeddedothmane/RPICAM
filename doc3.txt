@@ -1,0 +1,247 @@
+doc sync
+
+g++ -std=c++17 -O2 pending_sftp_sync_v2.cpp -lcurl -o pending_sftp_sync_v2
+
+Oui. Voici les commandes exactes pour mettre le daemon en service, avec ta config :
+
+VPS : 10.20.30.40
+user SSH : root
+dossier distant : /root/RPICAMM/upload
+
+Attention importante : 10.20.30.40 est une IP privée.
+Donc la RPi ne pourra joindre ce VPS que si elle est sur le même réseau, ou via VPN, ou via un routage interne.
+
+1) Côté Raspberry Pi
+A. Installer les dépendances
+sudo apt update
+sudo apt install -y g++ libcurl4-openssl-dev openssh-client
+B. Créer les dossiers locaux
+mkdir -p /home/pi/captures_cam3/pending
+mkdir -p /home/pi/captures_cam3/uploaded
+mkdir -p /home/pi/captures_cam3/failed
+C. Créer la clé SSH dédiée
+mkdir -p /home/pi/.ssh
+chmod 700 /home/pi/.ssh
+ssh-keygen -t ed25519 -f /home/pi/.ssh/id_ed25519_capture_sync -N ""
+D. Ajouter la clé hôte du VPS
+ssh-keyscan -H 10.20.30.40 >> /home/pi/.ssh/known_hosts
+chmod 600 /home/pi/.ssh/known_hosts
+E. Copier le fichier C++ sur la RPi et le compiler
+
+Si le fichier est déjà sur la RPi, place-toi dans son dossier et compile :
+
+g++ -std=c++17 -O2 pending_sftp_sync_v2.cpp -lcurl -o pending_sftp_sync_v2
+F. Installer le binaire
+sudo install -m 0755 pending_sftp_sync_v2 /usr/local/bin/pending_sftp_sync_v2
+G. Tester manuellement avant le service
+/usr/local/bin/pending_sftp_sync_v2 \
+  --host 10.20.30.40 \
+  --user root \
+  --remote-dir /root/RPICAMM/upload \
+  --pending-dir /home/pi/captures_cam3/pending \
+  --uploaded-dir /home/pi/captures_cam3/uploaded \
+  --failed-dir /home/pi/captures_cam3/failed \
+  --private-key /home/pi/.ssh/id_ed25519_capture_sync \
+  --public-key /home/pi/.ssh/id_ed25519_capture_sync.pub \
+  --known-hosts /home/pi/.ssh/known_hosts \
+  --scan-interval-s 2 \
+  --retry-wait-s 10 \
+  --offline-wait-s 15 \
+  --connect-timeout-s 10 \
+  --transfer-timeout-s 120 \
+  --low-speed-limit 32 \
+  --low-speed-time-s 30 \
+  --max-retries 10 \
+  --stability-seconds 5
+
+Laisse tourner, puis mets un fichier test dans pending.
+
+2) Côté VPS
+A. Installer OpenSSH server
+sudo apt update
+sudo apt install -y openssh-server
+B. Créer le dossier distant
+sudo mkdir -p /root/RPICAMM/upload
+sudo chmod 700 /root/RPICAMM
+sudo chmod 700 /root/RPICAMM/upload
+C. Autoriser la clé publique de la RPi pour root
+
+Sur la RPi, affiche la clé publique :
+
+cat /home/pi/.ssh/id_ed25519_capture_sync.pub
+
+Copie la sortie.
+
+Puis sur le VPS :
+
+sudo mkdir -p /root/.ssh
+sudo chmod 700 /root/.ssh
+sudo nano /root/.ssh/authorized_keys
+
+Colle la clé publique dedans, puis :
+
+sudo chmod 600 /root/.ssh/authorized_keys
+D. Vérifier la config SSH
+
+Ouvre :
+
+sudo nano /etc/ssh/sshd_config
+
+Vérifie qu’on n’interdit pas la connexion root par clé.
+Il faut quelque chose de compatible avec :
+
+PermitRootLogin prohibit-password
+PubkeyAuthentication yes
+
+ou éventuellement :
+
+PermitRootLogin yes
+PubkeyAuthentication yes
+
+Le plus propre est prohibit-password : root autorisé par clé, pas par mot de passe.
+
+Puis redémarre SSH :
+
+sudo systemctl restart ssh
+sudo systemctl status ssh
+3) Test de connexion SSH/SFTP depuis la RPi
+Test SSH simple
+ssh -i /home/pi/.ssh/id_ed25519_capture_sync root@10.20.30.40
+
+Si ça passe, c’est bon.
+
+Test SFTP
+sftp -i /home/pi/.ssh/id_ed25519_capture_sync root@10.20.30.40
+
+Une fois connecté dans sftp, teste :
+
+cd /root/RPICAMM/upload
+pwd
+bye
+4) Installer le service systemd sur la RPi
+A. Copier le fichier service
+
+Si tu as le fichier pending_sftp_sync_v2.service sur la RPi :
+
+sudo cp pending_sftp_sync_v2.service /etc/systemd/system/pending_sftp_sync_v2.service
+B. Activer et démarrer
+sudo systemctl daemon-reload
+sudo systemctl enable --now pending_sftp_sync_v2.service
+C. Vérifier
+systemctl status pending_sftp_sync_v2.service
+journalctl -u pending_sftp_sync_v2.service -f
+5) Test réel de bout en bout
+
+Sur la RPi, mets un fichier dans pending :
+
+echo test > /home/pi/captures_cam3/pending/test1.txt
+
+Attends plus de 5 secondes, puis regarde :
+
+ls -l /home/pi/captures_cam3/pending
+ls -l /home/pi/captures_cam3/uploaded
+ls -l /home/pi/captures_cam3/failed
+
+Et sur le VPS :
+
+ls -l /root/RPICAMM/upload
+Paramètres essentiels côté RPi
+
+Les plus importants sont ceux-là :
+
+--pending-dir
+C’est le dossier surveillé. Le daemon prend les fichiers ici.
+
+--uploaded-dir
+Après upload réussi, le fichier local est déplacé ici.
+
+--failed-dir
+Après 10 échecs non réseau, le fichier va ici.
+
+--host
+Adresse du VPS. Chez toi : 10.20.30.40.
+
+--user
+Utilisateur SSH distant. Chez toi : root.
+
+--remote-dir
+Dossier de destination sur le VPS. Chez toi : /root/RPICAMM/upload.
+
+--private-key
+Clé privée utilisée par la RPi pour s’authentifier.
+
+--known-hosts
+Permet de vérifier qu’on parle bien au bon serveur SSH.
+
+--stability-seconds
+Très important pour ton cas.
+Un fichier modifié il y a moins de 5 secondes est ignoré au listing, pour éviter d’envoyer un fichier encore en cours d’écriture.
+
+--max-retries
+Nombre maximal d’échecs non réseau avant d’abandonner ce fichier.
+
+--offline-wait-s
+Temps d’attente quand le VPS/réseau est indisponible.
+
+--scan-interval-s
+Temps d’attente quand pending est vide.
+
+Paramètres essentiels côté VPS
+
+Le plus important côté VPS n’est pas du code, mais la config SSH :
+
+authorized_keys
+C’est ce qui permet à la RPi de se connecter sans mot de passe.
+
+PermitRootLogin
+Comme tu utilises root, il faut autoriser root au moins par clé.
+
+Le dossier /root/RPICAMM/upload
+Il doit exister et être accessible à l’utilisateur qui se connecte, ici root.
+
+La connectivité réseau
+Le port SSH 22 doit être accessible entre la RPi et le VPS.
+
+Est-ce qu’il faut du code côté VPS ?
+
+Non.
+Tu n’as pas besoin de code côté VPS.
+
+Il faut seulement :
+
+un serveur SSH/SFTP fonctionnel
+une clé autorisée
+le dossier distant créé
+Mon conseil sécurité
+
+Ça marchera avec root, mais ce n’est pas le plus propre.
+Le mieux serait un utilisateur dédié, par exemple rpiupload, avec un dossier dédié. Mais pour démarrer vite, root par clé peut fonctionner.
+
+Commandes minimales résumées
+VPS
+sudo apt update
+sudo apt install -y openssh-server
+sudo mkdir -p /root/RPICAMM/upload
+sudo chmod 700 /root/RPICAMM /root/RPICAMM/upload
+sudo mkdir -p /root/.ssh
+sudo chmod 700 /root/.ssh
+sudo nano /root/.ssh/authorized_keys
+sudo chmod 600 /root/.ssh/authorized_keys
+sudo systemctl restart ssh
+RPi
+sudo apt update
+sudo apt install -y g++ libcurl4-openssl-dev openssh-client
+mkdir -p /home/pi/captures_cam3/pending /home/pi/captures_cam3/uploaded /home/pi/captures_cam3/failed
+mkdir -p /home/pi/.ssh
+chmod 700 /home/pi/.ssh
+ssh-keygen -t ed25519 -f /home/pi/.ssh/id_ed25519_capture_sync -N ""
+ssh-keyscan -H 10.20.30.40 >> /home/pi/.ssh/known_hosts
+chmod 600 /home/pi/.ssh/known_hosts
+g++ -std=c++17 -O2 pending_sftp_sync_v2.cpp -lcurl -o pending_sftp_sync_v2
+sudo install -m 0755 pending_sftp_sync_v2 /usr/local/bin/pending_sftp_sync_v2
+sudo cp pending_sftp_sync_v2.service /etc/systemd/system/pending_sftp_sync_v2.service
+sudo systemctl daemon-reload
+sudo systemctl enable --now pending_sftp_sync_v2.service
+systemctl status pending_sftp_sync_v2.service
+
+Je peux aussi te préparer maintenant une version plus sécurisée avec un utilisateur VPS dédié au lieu de root.
