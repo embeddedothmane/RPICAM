@@ -35,9 +35,10 @@ python3 capture_drive_uploader.py
 g++ -std=c++17 -O2 -pthread capture_upload_rpi_cam3.cpp -o capture_upload_rpi_cam3
 
 g++ -std=c++17 -O2 -pthread capture_last_image.cpp -o capture_last_image
-g++ -std=c++17 -O2 -pthread last_capture_server.cpp -o last_capture_server
 
+g++ -std=c++17 -O2 -pthread last_capture_server.cpp -o last_capture_server
 g++ -std=c++17 -O2 -pthread capture_on_demande.cpp -lmosquitto -o capture_on_demande
+g++ -std=c++17 -O2 pending_sftp_sync_v2.cpp -lcurl -o pending_sftp_sync_v2
 
 
 
